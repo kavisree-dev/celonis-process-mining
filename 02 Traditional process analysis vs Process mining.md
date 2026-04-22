@@ -1,4 +1,5 @@
 TRADITIONAL PROCESS ANALYSIS VS PROCESS MINING:
+
 **Introduction:**
 
 Before Process Mining became popular, companies mainly used traditional methods to understand and improve business processes.
