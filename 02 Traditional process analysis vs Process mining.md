@@ -106,6 +106,6 @@ It helps companies reduce guesswork and improve operations with confidence.
 
 ---
 
-Traditional analysis shows how people think the process works.
+**Traditional analysis shows how people think the process works.**
 
-Process Mining shows how the process actually works.
+**Process Mining shows how the process actually works.**
