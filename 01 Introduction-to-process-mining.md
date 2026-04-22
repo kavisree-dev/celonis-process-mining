@@ -12,9 +12,9 @@ It helps companies by finding where business work gets stuck using real system d
 
 Image a company's invoice approval process.
 
-Expected process: Invoice received-manager approval-payment done.
+Expected process: Invoice received → manager approval → payment done.
 
-Actual process: Invoice received-delay-rework-approval-more delay-payment done.
+Actual process: Invoice received → delay → rework → approval → more delay → payment done.
 
 so, process mining helps identify:
 
