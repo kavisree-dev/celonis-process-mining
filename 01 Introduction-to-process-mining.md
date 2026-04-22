@@ -18,13 +18,13 @@ Actual process: Invoice received-delay-rework-approval-more delay-payment done.
 
 so, process mining helps identify:
 
-   -where delays happen
+   - where delays happen
    
-   -which steps repeat
+   - which steps repeat
    
-   -who creates bottlenecks
+   - who creates bottlenecks
    
-   -where pocess rules are broken
+   - where pocess rules are broken
    
 This helps companies save time, reduce cost, and improve efficiency.
 
@@ -34,31 +34,31 @@ This helps companies save time, reduce cost, and improve efficiency.
 
 Process Mining uses event logs from systems like:
 
-   -SAP
+   - SAP
    
-   -ERP systems
+   - ERP systems
    
-   -CRM platforms
+   - CRM platforms
    
-   -oracle
+   - oracle
    
-   -salesforce
+   - salesforce
    
-   -HR systems
+   - HR systems
    
-   -supply chain systems
+   - supply chain systems
    
 These systems store:
 
-   -timestamps
+   - timestamps
    
-   -user actions
+   - user actions
    
-   -transaction IDs
+   - transaction IDs
    
-   -approvals
+   - approvals
    
-   -case histories
+   - case histories
    
 This idea is called the digital footprint of the process.
 
@@ -66,19 +66,19 @@ This idea is called the digital footprint of the process.
 
 **Why companies use process mining?**
 
- -Improve operational efficiency
+ - Improve operational efficiency
  
- -Reduce delays
+ - Reduce delays
  
- -Remove unnecessary steps
+ - Remove unnecessary steps
  
- -Improve compliance
+ - Improve compliance
  
  -Reduce costs
  
- -Improve customer experience
+ - Improve customer experience
  
- -Make vetter decisions using data
+ - Make vetter decisions using data
 
  ---
  
@@ -86,16 +86,16 @@ This idea is called the digital footprint of the process.
  
  Traditional process analysis depends on:
  
-       -stakeholder meetings
-       -interviews
-       -manual process mapping
-       -assumptions
+       - stakeholder meetings
+       - interviews
+       - manual process mapping
+       - assumptions
        
  Process mining depends on:
 
-       -real system data
-       -objective analysis
-       -actual process behavior
+       - real system data
+       - objective analysis
+       - actual process behavior
 
           
 This makes process mining more accurate and reliable.
