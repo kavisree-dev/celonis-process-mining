@@ -57,3 +57,11 @@ As a research field, Enhancement enables organizations to adapt and use Process 
 
 4. **Process Mining Software**  
    Process mining tools aggregate this data and reconstruct processes, allowing you to visualize and analyze what is really happening in your business.
+
+   flowchart:
+   
+A[Discovery] --> B[Conformance]
+B --> C[Enhancement]
+C --> A[Discovery]
+
+
