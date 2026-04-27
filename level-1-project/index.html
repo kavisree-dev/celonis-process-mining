@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Celonis Process Mining Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --card: #1e2d40;
+    --border: #2a3f5f;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --radius: 10px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+  
+  /* --- Layout --- */
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar { width: 220px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  #main { flex: 1; overflow-y: auto; background: var(--bg); }
+  
+  /* --- Sidebar --- */
+  .sidebar-header { padding: 18px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-logo { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+  .sidebar-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sidebar-section { padding: 10px 8px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 1px 6px; border-radius: 7px; cursor: pointer; color: var(--muted); font-size: 13px; transition: all .15s; border: none; background: none; width: calc(100% - 12px); text-align: left; }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(0,212,255,.08); color: var(--accent); }
+  .nav-item .icon { width: 18px; text-align: center; font-size: 14px; }
+  .nav-badge { margin-left: auto; font-size: 10px; background: var(--accent2); color: #fff; padding: 2px 6px; border-radius: 20px; }
+  .progress-bar-wrap { padding: 12px 14px; margin-top: auto; border-top: 1px solid var(--border); }
+  .progress-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; }
+  .progress-fill { height: 4px; background: var(--accent); border-radius: 2px; transition: width .4s ease; }
+
+  /* --- Content sections --- */
+  .section { display: none; padding: 24px 28px; }
+  .section.active { display: block; }
+  .section-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .section-desc { color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  
+  /* --- Cards --- */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+  .card-title { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  
+  /* --- KPI cards --- */
+  .kpi { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .kpi-value { font-size: 24px; font-weight: 700; }
+  .kpi-delta { font-size: 11px; margin-top: 4px; }
+  .up { color: var(--danger); }
+  .down { color: var(--accent3); }
+  
+  /* --- Table --- */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .data-table td { padding: 9px 10px; border-bottom: 1px solid rgba(42,63,95,.4); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(255,255,255,.02); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .badge-green { background: rgba(16,185,129,.15); color: var(--accent3); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--danger); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--warn); }
+  .badge-blue { background: rgba(0,212,255,.1); color: var(--accent); }
+  
+  /* --- Tabs --- */
+  .tabs { display: flex; gap: 4px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; margin-bottom: 16px; width: fit-content; }
+  .tab { padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--muted); transition: all .15s; border: none; background: none; }
+  .tab.active { background: var(--card); color: var(--text); }
+  
+  /* --- Process flow graph --- */
+  #process-graph { width: 100%; height: 360px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .node-circle { cursor: pointer; transition: all .2s; }
+  .node-circle:hover { filter: brightness(1.2); }
+  
+  /* --- Event log input --- */
+  .log-row { display: grid; grid-template-columns: 100px 140px 160px 80px; gap: 8px; margin-bottom: 6px; align-items: center; }
+  .log-row input, .log-row select { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 12px; width: 100%; }
+  .log-row input:focus, .log-row select:focus { outline: none; border-color: var(--accent); }
+  .log-header { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  
+  /* --- Conformance checker --- */
+  .conformance-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(42,63,95,.4); font-size: 13px; }
+  .conformance-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: var(--accent3); }
+  .dot-red { background: var(--danger); }
+  .dot-yellow { background: var(--warn); }
+  
+  /* --- Buttons --- */
+  .btn { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #00b8d9; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--bg3); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  
+  /* --- Technique cards --- */
+  .technique-card { border-radius: var(--radius); border: 1px solid var(--border); padding: 16px; cursor: pointer; transition: all .2s; }
+  .technique-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .technique-icon { font-size: 22px; margin-bottom: 8px; }
+  .technique-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+  .technique-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  
+  /* --- Case study --- */
+  .case-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .case-tag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .case-stat { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .case-stat-item { text-align: center; }
+  .case-stat-val { font-size: 18px; font-weight: 700; }
+  .case-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  
+  /* --- Intro comparison --- */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .compare-col { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .compare-col.highlight { border-color: var(--accent); background: rgba(0,212,255,.04); }
+  .compare-head { font-weight: 600; margin-bottom: 10px; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+  .compare-item { font-size: 12px; color: var(--muted); padding: 5px 0; border-bottom: 1px solid rgba(42,63,95,.3); display: flex; align-items: flex-start; gap: 7px; }
+  .compare-item:last-child { border-bottom: none; }
+  
+  /* --- Market chart wrapper --- */
+  #market-chart { width: 100%; height: 260px; }
+  
+  /* --- Object centric toggle --- */
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .toggle { position: relative; width: 40px; height: 22px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: .3s; }
+  .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .3s; }
+  input:checked + .toggle-slider { background: var(--accent); }
+  input:checked + .toggle-slider:before { transform: translateX(18px); }
+  
+  /* --- Digital footprint --- */
+  .footprint-timeline { position: relative; padding-left: 20px; }
+  .footprint-timeline:before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--border); border-radius: 2px; }
+  .fp-event { position: relative; margin-bottom: 14px; }
+  .fp-event:before { content: ''; position: absolute; left: -16px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .fp-event.deviation:before { background: var(--danger); }
+  .fp-time { font-size: 10px; color: var(--muted); }
+  .fp-label { font-size: 13px; margin-top: 1px; }
+  .fp-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  
+  /* --- Scroll hint --- */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">⬡ ProcessMine</div>
+      <div class="sidebar-sub">Level 1 Simulator</div>
+    </div>
+
+    <div class="sidebar-section">Fundamentals</div>
+    <button class="nav-item active" data-section="intro" onclick="navigate('intro', this)">
+      <span class="icon">🏠</span> Introduction
+    </button>
+    <button class="nav-item" data-section="comparison" onclick="navigate('comparison', this)">
+      <span class="icon">⚖️</span> Traditional vs PM
+    </button>
+    <button class="nav-item" data-section="celonis" onclick="navigate('celonis', this)">
+      <span class="icon">🌐</span> What is Celonis
+    </button>
+    <button class="nav-item" data-section="datamining" onclick="navigate('datamining', this)">
+      <span class="icon">⛏️</span> Data vs Process Mining
+    </button>
+
+    <div class="sidebar-section">Core Concepts</div>
+    <button class="nav-item" data-section="benefits" onclick="navigate('benefits', this)">
+      <span class="icon">✅</span> Benefits
+    </button>
+    <button class="nav-item" data-section="challenges" onclick="navigate('challenges', this)">
+      <span class="icon">⚡</span> Business Challenges
+    </button>
+    <button class="nav-item" data-section="market" onclick="navigate('market', this)">
+      <span class="icon">📈</span> Market Growth
+    </button>
+    <button class="nav-item" data-section="footprint" onclick="navigate('footprint', this)">
+      <span class="icon">🔍</span> Digital Footprint
+    </button>
+
+    <div class="sidebar-section">Simulator</div>
+    <button class="nav-item" data-section="eventlog" onclick="navigate('eventlog', this)">
+      <span class="icon">📋</span> Event Log
+    </button>
+    <button class="nav-item" data-section="datamodel" onclick="navigate('datamodel', this)">
+      <span class="icon">🗂️</span> Data Model
+    </button>
+    <button class="nav-item" data-section="processgraph" onclick="navigate('processgraph', this)">
+      <span class="icon">🔗</span> Process Graph
+    </button>
+
+    <div class="sidebar-section">Advanced</div>
+    <button class="nav-item" data-section="caseobject" onclick="navigate('caseobject', this)">
+      <span class="icon">🔄</span> Case vs Object
+    </button>
+    <button class="nav-item" data-section="techniques" onclick="navigate('techniques', this)">
+      <span class="icon">🧠</span> Techniques
+    </button>
+    <button class="nav-item" data-section="casestudies" onclick="navigate('casestudies', this)">
+      <span class="icon">📁</span> Case Studies <span class="nav-badge">4</span>
+    </button>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-label">
+        <span>Progress</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main id="main">
+
+    <!-- 1. Introduction -->
+    <div id="section-intro" class="section active">
+      <div class="section-title">What is Process Mining?</div>
+      <div class="section-desc">Process mining extracts knowledge from event logs in information systems, enabling fact-based process analysis and improvement.</div>
+
+      <div class="card-grid">
+        <div class="kpi"><div class="kpi-label">Global Market Value</div><div class="kpi-value" style="color:var(--accent)">$3.8B</div><div class="kpi-delta up">2024 estimate</div></div>
+        <div class="kpi"><div class="kpi-label">Fortune 500 Adoption</div><div class="kpi-value" style="color:var(--accent3)">68%</div><div class="kpi-delta down">+12% YoY</div></div>
+        <div class="kpi"><div class="kpi-label">Avg. Process Efficiency Gain</div><div class="kpi-value" style="color:var(--warn)">30%</div><div class="kpi-delta down">After deployment</div></div>
+        <div class="kpi"><div class="kpi-label">Celonis Market Share</div><div class="kpi-value" style="color:var(--accent2)">~27%</div><div class="kpi-delta">Leader in Gartner MQ</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">The Core Idea</div>
+        <p style="color:var(--muted);font-size:13px;line-height:1.7">Every time a business transaction happens — a purchase order is created, an invoice is approved, a ticket is resolved — the system logs a timestamped event. Process mining reads these digital footprints and reconstructs the actual process, not the assumed one. It answers: <em style="color:var(--text)">What really happens in our business, and why?</em></p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Three Pillars of Process Mining</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px">
+          <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent)">
+            <div style="font-weight:600;margin-bottom:6px">Discovery</div>
+            <div style="font-size:12px;color:var(--muted)">Build the process model automatically from raw event data — no manual mapping required.</div>
+          </div>
+          <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--warn)">
+            <div style="font-weight:600;margin-bottom:6px">Conformance</div>
+            <div style="font-size:12px;color:var(--muted)">Compare actual process execution against the target model. Identify where deviations occur.</div>
+          </div>
+          <div style="padding:14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent3)">
+            <div style="font-weight:600;margin-bottom:6px">Enhancement</div>
+            <div style="font-size:12px;color:var(--muted)">Extend or improve existing models using additional event data (performance, decisions, resources).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Comparison -->
+    <div id="section-comparison" class="section">
+      <div class="section-title">Traditional Analysis vs Process Mining</div>
+      <div class="section-desc">Organizations have long used interviews, workshops, and periodic reports to understand their processes. Process mining replaces assumptions with evidence.</div>
+
+      <div class="compare-grid">
+        <div class="compare-col">
+          <div class="compare-head">📊 Traditional Analysis</div>
+          <div class="compare-item">⏱ <span>Manual workshops take weeks or months to complete</span></div>
+          <div class="compare-item">🧍 <span>Relies on expert opinions and interviews — often biased</span></div>
+          <div class="compare-item">📸 <span>Snapshot-in-time; doesn't capture variation over time</span></div>
+          <div class="compare-item">📉 <span>Sample-based — only a fraction of cases analyzed</span></div>
+          <div class="compare-item">🔁 <span>Loop detection and rework are frequently missed</span></div>
+          <div class="compare-item">💸 <span>High consulting costs for periodic reviews</span></div>
+        </div>
+        <div class="compare-col highlight">
+          <div class="compare-head" style="color:var(--accent)">⬡ Process Mining</div>
+          <div class="compare-item">⚡ <span>Automated analysis in minutes from existing system logs</span></div>
+          <div class="compare-item">📡 <span>100% objective — based on actual data, not perception</span></div>
+          <div class="compare-item">🔄 <span>Continuous monitoring — captures process drift over time</span></div>
+          <div class="compare-item">📊 <span>Entire population of cases, not just samples</span></div>
+          <div class="compare-item">🔍 <span>Rework, loops, and bottlenecks precisely quantified</span></div>
+          <div class="compare-item">💡 <span>Self-service insights for operational teams</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">When to use which?</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.6">Traditional analysis is still valuable for <strong style="color:var(--text)">new process design</strong> (where no historical data exists) and <strong style="color:var(--text)">qualitative context</strong> gathering. Process mining excels when the process is already running in a system like SAP, Salesforce, or ServiceNow — which is the case in virtually every modern enterprise.</p>
+      </div>
+    </div>
+
+    <!-- 3. What is Celonis -->
+    <div id="section-celonis" class="section">
+      <div class="section-title">What is Celonis?</div>
+      <div class="section-desc">Celonis is the global leader in process mining software, founded in Munich in 2011 by three TU Munich students. It turns process data into execution capacity.</div>
+
+      <div class="card-grid">
+        <div class="kpi"><div class="kpi-label">Founded</div><div class="kpi-value">2011</div><div class="kpi-delta" style="color:var(--muted)">Munich, Germany</div></div>
+        <div class="kpi"><div class="kpi-label">Valuation</div><div class="kpi-value" style="color:var(--accent)">$13B</div><div class="kpi-delta" style="color:var(--muted)">As of 2021 funding</div></div>
+        <div class="kpi"><div class="kpi-label">Customers</div><div class="kpi-value" style="color:var(--accent3)">3,000+</div><div class="kpi-delta" style="color:var(--muted)">Across 60+ countries</div></div>
+        <div class="kpi"><div class="kpi-label">Employees</div><div class="kpi-value">3,500+</div><div class="kpi-delta" style="color:var(--muted)">Globally</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Celonis Execution Management System (EMS)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:6px">PROCESS DATA LAYER</div>
+            <div style="font-size:12px;color:var(--muted)">Connects to SAP, Salesforce, ServiceNow, Oracle — extracting full event histories from any ERP or CRM system.</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--accent3);font-weight:600;margin-bottom:6px">PROCESS ANALYTICS</div>
+            <div style="font-size:12px;color:var(--muted)">Real-time dashboards, OLAP filters, custom KPIs, and AI-powered root cause analysis.</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--warn);font-weight:600;margin-bottom:6px">ACTION ENGINE</div>
+            <div style="font-size:12px;color:var(--muted)">Pushes recommendations directly into SAP or other systems. Closes the loop from insight to execution.</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--accent2);font-weight:600;margin-bottom:6px">PROCESS APPS</div>
+            <div style="font-size:12px;color:var(--muted)">Pre-built apps for P2P, O2C, Logistics, Finance — with industry benchmarks out of the box.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Key Differentiators</div>
+        <table class="data-table">
+          <tr><th>Feature</th><th>Celonis</th><th>Generic BI Tools</th></tr>
+          <tr><td>Process-native</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-red">No</span></td></tr>
+          <tr><td>ERP connectors (SAP, Oracle)</td><td><span class="badge badge-green">Pre-built</span></td><td><span class="badge badge-yellow">Custom</span></td></tr>
+          <tr><td>AI-driven root cause</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-red">No</span></td></tr>
+          <tr><td>Action automation</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-red">No</span></td></tr>
+          <tr><td>Industry benchmarks</td><td><span class="badge badge-green">Built-in</span></td><td><span class="badge badge-red">Unavailable</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 4. Data Mining vs Process Mining -->
+    <div id="section-datamining" class="section">
+      <div class="section-title">Data Mining vs Process Mining</div>
+      <div class="section-desc">Both extract insights from data — but they ask fundamentally different questions.</div>
+
+      <div class="compare-grid">
+        <div class="compare-col">
+          <div class="compare-head">🗃️ Data Mining</div>
+          <div class="compare-item">🔎 <span><strong style="color:var(--text)">Goal:</strong> Discover patterns in structured datasets</span></div>
+          <div class="compare-item">📦 <span><strong style="color:var(--text)">Input:</strong> Static tables, databases, feature vectors</span></div>
+          <div class="compare-item">🔢 <span><strong style="color:var(--text)">Output:</strong> Classification models, clusters, association rules</span></div>
+          <div class="compare-item">📌 <span><strong style="color:var(--text)">Focus:</strong> What is in the data?</span></div>
+          <div class="compare-item">🧪 <span>Techniques: Regression, clustering, decision trees, neural nets</span></div>
+        </div>
+        <div class="compare-col highlight">
+          <div class="compare-head" style="color:var(--accent)">⬡ Process Mining</div>
+          <div class="compare-item">🔎 <span><strong style="color:var(--text)">Goal:</strong> Reconstruct and analyze business processes</span></div>
+          <div class="compare-item">📦 <span><strong style="color:var(--text)">Input:</strong> Event logs with Case ID, Activity, Timestamp</span></div>
+          <div class="compare-item">🔢 <span><strong style="color:var(--text)">Output:</strong> Process models, flow maps, conformance reports</span></div>
+          <div class="compare-item">📌 <span><strong style="color:var(--text)">Focus:</strong> How does the process actually flow?</span></div>
+          <div class="compare-item">🧪 <span>Techniques: Alpha algorithm, Heuristics Miner, Inductive Miner</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">The Minimal Event Log Schema</div>
+        <table class="data-table">
+          <tr><th>Case ID</th><th>Activity</th><th>Timestamp</th><th>Resource</th></tr>
+          <tr><td><code style="color:var(--accent)">PO-1001</code></td><td>Create PO</td><td>2024-01-10 09:00</td><td>Alice</td></tr>
+          <tr><td><code style="color:var(--accent)">PO-1001</code></td><td>Approve PO</td><td>2024-01-10 14:30</td><td>Bob</td></tr>
+          <tr><td><code style="color:var(--accent)">PO-1001</code></td><td>Goods Receipt</td><td>2024-01-13 11:00</td><td>Carol</td></tr>
+          <tr><td><code style="color:var(--accent)">PO-1002</code></td><td>Create PO</td><td>2024-01-10 10:15</td><td>Alice</td></tr>
+          <tr><td><code style="color:var(--accent)">PO-1002</code></td><td>Goods Receipt</td><td>2024-01-11 08:45</td><td>Dave</td></tr>
+          <tr><td><code style="color:var(--accent)">PO-1002</code></td><td>Approve PO</td><td>2024-01-11 16:00</td><td>Bob</td></tr>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">PO-1002 has a deviation: Goods were received <em>before</em> PO approval — a control violation. Data mining would never catch this; process mining flags it immediately.</p>
+      </div>
+    </div>
+
+    <!-- 5. Benefits -->
+    <div id="section-benefits" class="section">
+      <div class="section-title">Benefits of Process Mining</div>
+      <div class="section-desc">From cost reduction to compliance — process mining creates measurable business value across every function.</div>
+
+      <div class="card-grid">
+        <div class="kpi"><div class="kpi-label">Cost Reduction (P2P)</div><div class="kpi-value" style="color:var(--accent3)">25%</div><div class="kpi-delta down">Typical savings</div></div>
+        <div class="kpi"><div class="kpi-label">Touchless Invoice Rate</div><div class="kpi-value" style="color:var(--accent)">80%</div><div class="kpi-delta down">After automation</div></div>
+        <div class="kpi"><div class="kpi-label">Compliance Deviation Rate</div><div class="kpi-value" style="color:var(--danger)">-60%</div><div class="kpi-delta down">Post-implementation</div></div>
+        <div class="kpi"><div class="kpi-label">Process Analysis Time</div><div class="kpi-value" style="color:var(--warn)">-90%</div><div class="kpi-delta down">vs traditional methods</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Core Benefits by Category</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+          <div style="padding:12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px">
+            <div style="color:var(--accent3);font-weight:600;font-size:12px;margin-bottom:8px">OPERATIONAL EFFICIENCY</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6">• Eliminate bottlenecks with real throughput data<br>• Identify rework loops and redundant steps<br>• Prioritize automation targets using data</div>
+          </div>
+          <div style="padding:12px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:8px">
+            <div style="color:var(--accent);font-weight:600;font-size:12px;margin-bottom:8px">COMPLIANCE & RISK</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6">• Detect SoD violations and policy breaches<br>• Continuous audit trail from system logs<br>• Regulatory reporting backed by evidence</div>
+          </div>
+          <div style="padding:12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px">
+            <div style="color:var(--warn);font-weight:600;font-size:12px;margin-bottom:8px">COST REDUCTION</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6">• Reduce manual effort through targeted automation<br>• Cut late payment penalties in P2P<br>• Lower DSO in O2C processes</div>
+          </div>
+          <div style="padding:12px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.2);border-radius:8px">
+            <div style="color:var(--accent2);font-weight:600;font-size:12px;margin-bottom:8px">CUSTOMER EXPERIENCE</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6">• Reduce order-to-delivery cycle time<br>• Identify failure points in customer journeys<br>• Benchmark against industry peers</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Business Challenges -->
+    <div id="section-challenges" class="section">
+      <div class="section-title">Business Challenges in Modern Companies</div>
+      <div class="section-desc">Large organizations face structural complexity that makes traditional management nearly impossible. Process mining was built to address this directly.</div>
+
+      <div class="card">
+        <div class="card-title">Common Pain Points — and PM Solutions</div>
+        <table class="data-table" style="margin-top:6px">
+          <tr><th>Challenge</th><th>Impact</th><th>How PM Solves It</th></tr>
+          <tr>
+            <td>Process fragmentation across ERP modules</td>
+            <td><span class="badge badge-red">High</span></td>
+            <td style="font-size:12px;color:var(--muted)">Unified view across SAP MM, SD, FI modules</td>
+          </tr>
+          <tr>
+            <td>Invisible rework and manual workarounds</td>
+            <td><span class="badge badge-red">High</span></td>
+            <td style="font-size:12px;color:var(--muted)">Loop detection in process graphs</td>
+          </tr>
+          <tr>
+            <td>Missed SLAs and late deliveries</td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+            <td style="font-size:12px;color:var(--muted)">Throughput time analysis per case variant</td>
+          </tr>
+          <tr>
+            <td>Lack of automation ROI clarity</td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+            <td style="font-size:12px;color:var(--muted)">Automation candidate scoring with frequency data</td>
+          </tr>
+          <tr>
+            <td>Audit preparation is manual and slow</td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+            <td style="font-size:12px;color:var(--muted)">Automated compliance reporting from event logs</td>
+          </tr>
+          <tr>
+            <td>Digital transformation without baseline</td>
+            <td><span class="badge badge-blue">Strategic</span></td>
+            <td style="font-size:12px;color:var(--muted)">As-is process capture before redesign</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">The Visibility Gap</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7">Organizations typically operate with only <strong style="color:var(--danger)">12–18%</strong> visibility into their end-to-end processes. The rest is hidden in system logs, email threads, and tribal knowledge. Process mining closes this gap — not with consultants and workshops, but with the data that already exists in every system of record.</p>
+      </div>
+    </div>
+
+    <!-- 7. Market Growth -->
+    <div id="section-market" class="section">
+      <div class="section-title">Process Mining Market Growth</div>
+      <div class="section-desc">From a niche academic concept to a multi-billion dollar enterprise software category in under a decade.</div>
+
+      <div class="card">
+        <div class="card-title">Market Size 2019–2028 (USD Billion)</div>
+        <canvas id="market-chart" role="img" aria-label="Bar chart showing process mining market growth from 2019 to 2028">Market size data: 2019: $0.6B, 2020: $0.9B, 2021: $1.3B, 2022: $1.9B, 2023: $2.7B, 2024: $3.8B, 2025: $5.4B (projected), 2026: $7.2B (projected), 2027: $9.1B (projected), 2028: $11.5B (projected)</canvas>
+      </div>
+
+      <div class="card-grid">
+        <div class="kpi"><div class="kpi-label">CAGR 2023–2028</div><div class="kpi-value" style="color:var(--accent)">33%</div><div class="kpi-delta down">Compound annual growth</div></div>
+        <div class="kpi"><div class="kpi-label">Key Drivers</div><div class="kpi-value" style="font-size:14px;line-height:1.4;margin-top:4px">AI + ERP<br>modernization</div></div>
+        <div class="kpi"><div class="kpi-label">Top Vendors</div><div class="kpi-value" style="font-size:13px;line-height:1.6;margin-top:2px">Celonis<br>UiPath · SAP</div></div>
+      </div>
+    </div>
+
+    <!-- 8. Digital Footprint -->
+    <div id="section-footprint" class="section">
+      <div class="section-title">Digital Footprint</div>
+      <div class="section-desc">Every action in an enterprise system creates a timestamped record. These "digital breadcrumbs" are the raw material of process mining.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="card">
+          <div class="card-title">Purchase Order: PO-2204 — Full Timeline</div>
+          <div class="footprint-timeline" style="margin-top:8px">
+            <div class="fp-event">
+              <div class="fp-time">Jan 10 · 09:02 AM</div>
+              <div class="fp-label">Purchase Order Created</div>
+              <div class="fp-meta">User: j.sharma · System: SAP MM · Vendor: Acme Corp</div>
+            </div>
+            <div class="fp-event">
+              <div class="fp-time">Jan 10 · 11:30 AM</div>
+              <div class="fp-label">3-Way Match Initiated</div>
+              <div class="fp-meta">Auto-triggered · PO vs. Contract comparison</div>
+            </div>
+            <div class="fp-event deviation">
+              <div class="fp-time">Jan 11 · 08:45 AM</div>
+              <div class="fp-label" style="color:var(--danger)">Goods Receipt Before Approval ⚠</div>
+              <div class="fp-meta">User: d.kumar · Deviation from SOP detected</div>
+            </div>
+            <div class="fp-event">
+              <div class="fp-time">Jan 13 · 02:15 PM</div>
+              <div class="fp-label">PO Approved</div>
+              <div class="fp-meta">User: s.patel · Level 2 approval</div>
+            </div>
+            <div class="fp-event">
+              <div class="fp-time">Jan 15 · 10:00 AM</div>
+              <div class="fp-label">Invoice Received</div>
+              <div class="fp-meta">Amount: ₹1,45,000 · Due: Feb 14</div>
+            </div>
+            <div class="fp-event">
+              <div class="fp-time">Jan 16 · 04:30 PM</div>
+              <div class="fp-label">Payment Cleared</div>
+              <div class="fp-meta">Bank: HDFC · Throughput: 6d 7h 28m</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Where Do Footprints Come From?</div>
+          <div style="display:grid;gap:8px;margin-top:6px">
+            <div style="background:var(--bg3);border-radius:7px;padding:10px 12px;font-size:13px">
+              <span style="color:var(--accent);font-weight:600">ERP Systems</span><br>
+              <span style="color:var(--muted);font-size:12px">SAP, Oracle EBS — every document change logs a line item in the change document table (CDPOS, CDHDR)</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:7px;padding:10px 12px;font-size:13px">
+              <span style="color:var(--accent3);font-weight:600">CRM Systems</span><br>
+              <span style="color:var(--muted);font-size:12px">Salesforce logs every stage transition in opportunity history — the backbone of O2C mining</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:7px;padding:10px 12px;font-size:13px">
+              <span style="color:var(--warn);font-weight:600">ITSM Platforms</span><br>
+              <span style="color:var(--muted);font-size:12px">ServiceNow, Jira — ticket status transitions form a clean event log for incident process mining</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:7px;padding:10px 12px;font-size:13px">
+              <span style="color:var(--accent2);font-weight:600">Custom Applications</span><br>
+              <span style="color:var(--muted);font-size:12px">Any system with an audit trail or state machine can be connected — even legacy systems via ETL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. Event Log -->
+    <div id="section-eventlog" class="section">
+      <div class="section-title">Anatomy of an Event Log</div>
+      <div class="section-desc">The event log is the input to every process mining algorithm. It must contain at minimum: Case ID, Activity, and Timestamp.</div>
+
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('log-view', this)">Sample Log</button>
+        <button class="tab" onclick="switchTab('log-stats', this)">Log Statistics</button>
+        <button class="tab" onclick="switchTab('log-variants', this)">Variants</button>
+      </div>
+
+      <div id="log-view">
+        <div class="card">
+          <div class="card-title">P2P Process — Event Log (20 cases, 87 events)</div>
+          <table class="data-table">
+            <tr><th>Case ID</th><th>Activity</th><th>Timestamp</th><th>Resource</th><th>Duration</th><th>Status</th></tr>
+            <tr><td>PO-001</td><td>Create PO</td><td>2024-01-02 09:00</td><td>Alice</td><td>—</td><td><span class="badge badge-blue">Start</span></td></tr>
+            <tr><td>PO-001</td><td>Approve PO</td><td>2024-01-02 14:00</td><td>Bob</td><td>5h</td><td><span class="badge badge-green">On-time</span></td></tr>
+            <tr><td>PO-001</td><td>Goods Receipt</td><td>2024-01-05 10:00</td><td>Carol</td><td>2d 20h</td><td><span class="badge badge-green">Compliant</span></td></tr>
+            <tr><td>PO-001</td><td>Invoice Received</td><td>2024-01-06 09:30</td><td>System</td><td>23h</td><td><span class="badge badge-green">Matched</span></td></tr>
+            <tr><td>PO-001</td><td>Payment Cleared</td><td>2024-01-10 16:00</td><td>Finance</td><td>4d 6h</td><td><span class="badge badge-green">Complete</span></td></tr>
+            <tr><td>PO-002</td><td>Create PO</td><td>2024-01-03 11:00</td><td>Alice</td><td>—</td><td><span class="badge badge-blue">Start</span></td></tr>
+            <tr><td>PO-002</td><td>Goods Receipt</td><td>2024-01-04 08:00</td><td>Dave</td><td>21h</td><td><span class="badge badge-red">Deviation</span></td></tr>
+            <tr><td>PO-002</td><td>Approve PO</td><td>2024-01-05 15:00</td><td>Bob</td><td>1d 7h</td><td><span class="badge badge-yellow">Late</span></td></tr>
+            <tr><td>PO-002</td><td>Invoice Received</td><td>2024-01-07 10:00</td><td>System</td><td>1d 19h</td><td><span class="badge badge-yellow">Price Diff</span></td></tr>
+            <tr><td>PO-002</td><td>Payment Cleared</td><td>2024-01-15 12:00</td><td>Finance</td><td>8d 2h</td><td><span class="badge badge-red">Late Pay</span></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div id="log-stats" style="display:none">
+        <div class="card-grid">
+          <div class="kpi"><div class="kpi-label">Total Cases</div><div class="kpi-value">20</div></div>
+          <div class="kpi"><div class="kpi-label">Total Events</div><div class="kpi-value">87</div></div>
+          <div class="kpi"><div class="kpi-label">Avg Throughput</div><div class="kpi-value" style="color:var(--warn)">6.2d</div></div>
+          <div class="kpi"><div class="kpi-label">Deviation Rate</div><div class="kpi-value" style="color:var(--danger)">35%</div></div>
+          <div class="kpi"><div class="kpi-label">Unique Activities</div><div class="kpi-value">5</div></div>
+          <div class="kpi"><div class="kpi-label">Unique Resources</div><div class="kpi-value">6</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Activity Frequency Distribution</div>
+          <div style="margin-top:8px">
+            <div id="freq-bars"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="log-variants" style="display:none">
+        <div class="card">
+          <div class="card-title">Process Variants (How cases actually flowed)</div>
+          <div style="margin-top:6px;display:grid;gap:10px">
+            <div style="background:var(--bg3);border-radius:8px;padding:12px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:12px;font-weight:600">Variant 1 — Happy Path</span>
+                <span class="badge badge-green">52% (10/20)</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Create PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Approve PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Goods Receipt</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Invoice</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(16,185,129,.1);color:var(--accent3);padding:4px 8px;border-radius:5px;font-size:11px">Payment</span>
+              </div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:12px;font-weight:600">Variant 2 — GR Before Approval</span>
+                <span class="badge badge-red">25% (5/20)</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Create PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(239,68,68,.15);color:var(--danger);padding:4px 8px;border-radius:5px;font-size:11px">Goods Receipt ⚠</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Approve PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Invoice</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(16,185,129,.1);color:var(--accent3);padding:4px 8px;border-radius:5px;font-size:11px">Payment</span>
+              </div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:12px;font-weight:600">Variant 3 — Rework Loop</span>
+                <span class="badge badge-yellow">23% (5/20)</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Create PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Approve PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(245,158,11,.15);color:var(--warn);padding:4px 8px;border-radius:5px;font-size:11px">Reject/Return ↺</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="background:rgba(0,212,255,.1);color:var(--accent);padding:4px 8px;border-radius:5px;font-size:11px">Create PO</span>
+                <span style="color:var(--muted)">→</span>
+                <span style="font-size:11px;color:var(--muted)">... continues</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. Data Model -->
+    <div id="section-datamodel" class="section">
+      <div class="section-title">Assembling the Data Model</div>
+      <div class="section-desc">Before process mining runs, raw tables from source systems must be assembled into a structured data model that maps cases to activities to timestamps.</div>
+
+      <div class="card">
+        <div class="card-title">P2P Data Model — Table Structure</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px">
+            <div style="color:var(--accent);font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.5px">CASE TABLE</div>
+            <div style="font-size:11px;line-height:1.8;color:var(--muted)">
+              🔑 <span style="color:var(--accent)">PO_Number (PK)</span><br>
+              Vendor_ID<br>Company_Code<br>Purchase_Org<br>PO_Date<br>Net_Value<br>Currency<br>Document_Type
+            </div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid rgba(124,58,237,.4);border-radius:8px;padding:12px">
+            <div style="color:var(--accent2);font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.5px">ACTIVITY TABLE</div>
+            <div style="font-size:11px;line-height:1.8;color:var(--muted)">
+              🔗 <span style="color:var(--accent2)">PO_Number (FK)</span><br>
+              Activity_Name<br>Timestamp<br>User_ID<br>System_Module<br>Change_Type<br>Field_Name<br>Old_Value · New_Value
+            </div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:12px">
+            <div style="color:var(--accent3);font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.5px">ATTRIBUTE TABLES</div>
+            <div style="font-size:11px;line-height:1.8;color:var(--muted)">
+              Vendor Master<br>Material Master<br>Cost Center<br>User Roles<br>GL Accounts<br>Currency Rates<br>SLA Thresholds
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Data Extraction Sources (SAP P2P)</div>
+        <table class="data-table">
+          <tr><th>SAP Table</th><th>Contains</th><th>Used For</th></tr>
+          <tr><td><code style="color:var(--accent)">EKKO</code></td><td>PO Header data</td><td>Case attributes</td></tr>
+          <tr><td><code style="color:var(--accent)">EKPO</code></td><td>PO Line items</td><td>Item-level analysis</td></tr>
+          <tr><td><code style="color:var(--accent)">CDHDR / CDPOS</code></td><td>Change documents</td><td>Event log (activities + timestamps)</td></tr>
+          <tr><td><code style="color:var(--accent)">MSEG</code></td><td>Goods movements</td><td>GR/GI events</td></tr>
+          <tr><td><code style="color:var(--accent)">BKPF / BSEG</code></td><td>FI documents</td><td>Invoice & payment events</td></tr>
+          <tr><td><code style="color:var(--accent)">LFA1</code></td><td>Vendor master</td><td>Vendor enrichment</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 11. Process Graph -->
+    <div id="section-processgraph" class="section">
+      <div class="section-title">Data Model → Process Graph</div>
+      <div class="section-desc">The process graph (Directly-Follows Graph) visualizes how activities connect. Edge thickness represents frequency; edge color represents throughput time.</div>
+
+      <div class="card" style="padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">P2P Process — Directly-Follows Graph</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="toggleVariant('happy')">Happy Path</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleVariant('all')">All Variants</button>
+            <button class="btn btn-primary btn-sm" onclick="toggleVariant('deviation')">Show Deviations</button>
+          </div>
+        </div>
+        <svg id="process-graph" viewBox="0 0 700 280"></svg>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Conformance Check Results</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+          <div class="kpi"><div class="kpi-label">Fitness Score</div><div class="kpi-value" style="color:var(--accent3)">0.74</div></div>
+          <div class="kpi"><div class="kpi-label">Precision</div><div class="kpi-value" style="color:var(--warn)">0.82</div></div>
+          <div class="kpi"><div class="kpi-label">Generalization</div><div class="kpi-value" style="color:var(--accent)">0.88</div></div>
+        </div>
+        <div class="conformance-row"><div class="conformance-dot dot-green"></div><span>Create PO → Approve PO — Compliant (10 cases, 100%)</span></div>
+        <div class="conformance-row"><div class="conformance-dot dot-red"></div><span>Create PO → Goods Receipt — Deviation (5 cases, 25%) — GR before approval violates 3-way match</span></div>
+        <div class="conformance-row"><div class="conformance-dot dot-yellow"></div><span>Approve PO → Reject → Create PO — Rework loop (5 cases, 23%) — avg +3.2 days cycle time</span></div>
+        <div class="conformance-row"><div class="conformance-dot dot-green"></div><span>Goods Receipt → Invoice → Payment — Compliant (all cases)</span></div>
+      </div>
+    </div>
+
+    <!-- 12. Case vs Object -->
+    <div id="section-caseobject" class="section">
+      <div class="section-title">Case-Centric vs Object-Centric Process Mining</div>
+      <div class="section-desc">Traditional process mining assigns every event to exactly one case. Object-centric PM allows one event to be related to multiple objects simultaneously — much closer to how real processes work.</div>
+
+      <div class="toggle-wrap">
+        <label class="toggle"><input type="checkbox" id="oc-toggle" onchange="toggleOC(this.checked)"><span class="toggle-slider"></span></label>
+        <span id="oc-label" style="font-size:13px">Case-Centric View</span>
+      </div>
+
+      <div id="oc-case" class="card">
+        <div class="card-title">Case-Centric Model — One case ID per process instance</div>
+        <table class="data-table">
+          <tr><th>Case ID</th><th>Activity</th><th>Timestamp</th><th>Limitation</th></tr>
+          <tr><td>PO-001</td><td>Approve PO</td><td>Jan 10 14:00</td><td><span class="badge badge-yellow">Convergence issue</span></td></tr>
+          <tr><td>PO-001-LINE1</td><td>Goods Receipt</td><td>Jan 12 10:00</td><td><span class="badge badge-red">Flattened — duplicated events</span></td></tr>
+          <tr><td>PO-001-LINE2</td><td>Goods Receipt</td><td>Jan 13 11:00</td><td><span class="badge badge-red">PO-001 split into 2 artificial cases</span></td></tr>
+          <tr><td>PO-001-LINE1</td><td>Invoice Cleared</td><td>Jan 15 09:00</td><td><span class="badge badge-yellow">Approve PO event duplicated</span></td></tr>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">Problem: When a PO has multiple line items, Goods Receipts, and Invoices — the classic approach either duplicates events or splits cases artificially. Both distort the model.</p>
+      </div>
+
+      <div id="oc-object" class="card" style="display:none;border-color:var(--accent)">
+        <div class="card-title" style="color:var(--accent)">Object-Centric Model — Events linked to multiple objects</div>
+        <table class="data-table">
+          <tr><th>Event ID</th><th>Activity</th><th>Objects Involved</th><th>Timestamp</th></tr>
+          <tr><td>E-1</td><td>Create PO</td><td><span class="badge badge-blue">PO-001</span></td><td>Jan 10 09:00</td></tr>
+          <tr><td>E-2</td><td>Approve PO</td><td><span class="badge badge-blue">PO-001</span></td><td>Jan 10 14:00</td></tr>
+          <tr><td>E-3</td><td>Goods Receipt</td><td><span class="badge badge-blue">PO-001</span> <span class="badge badge-green">ITEM-A</span></td><td>Jan 12 10:00</td></tr>
+          <tr><td>E-4</td><td>Goods Receipt</td><td><span class="badge badge-blue">PO-001</span> <span class="badge badge-green">ITEM-B</span></td><td>Jan 13 11:00</td></tr>
+          <tr><td>E-5</td><td>Invoice Cleared</td><td><span class="badge badge-blue">PO-001</span> <span class="badge badge-yellow">INV-9901</span></td><td>Jan 15 09:00</td></tr>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">Solution: E-3 and E-4 both relate to PO-001 without duplication. The PO, its line items, and invoices each have their own object type with their own lifecycle — analyzed together without distortion.</p>
+      </div>
+
+      <div class="card" style="margin-top:0">
+        <div class="card-title">When to Use Object-Centric?</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">Use OCPM when your process has <strong style="color:var(--text)">many-to-many relationships</strong> — one PO can have multiple invoices, one invoice can span multiple POs. Classic examples: P2P (PO → GR → Invoice), O2C (Order → Delivery → Invoice → Payment), Logistics (Shipment → Multiple Packages → Multiple Routes).</div>
+      </div>
+    </div>
+
+    <!-- 13. Techniques -->
+    <div id="section-techniques" class="section">
+      <div class="section-title">Process Mining Techniques</div>
+      <div class="section-desc">Three primary technique families — each answering a different question about your process.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="technique-card" style="background:rgba(0,212,255,.04)">
+          <div class="technique-icon">🔭</div>
+          <div class="technique-title">Process Discovery</div>
+          <div class="technique-desc">Automatically construct a process model from an event log — no prior knowledge required. Algorithms: Alpha Miner, Heuristics Miner, Inductive Miner, Fuzzy Miner.</div>
+        </div>
+        <div class="technique-card" style="background:rgba(239,68,68,.04)">
+          <div class="technique-icon">✅</div>
+          <div class="technique-title">Conformance Checking</div>
+          <div class="technique-desc">Compare actual execution against the reference model. Quantify fitness, precision, recall, and identify exactly where and how deviations occur.</div>
+        </div>
+        <div class="technique-card" style="background:rgba(16,185,129,.04)">
+          <div class="technique-icon">⚡</div>
+          <div class="technique-title">Process Enhancement</div>
+          <div class="technique-desc">Extend models with additional data — performance (time, cost), decisions (if/else branches), and resource perspectives (who does what, when).</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Discovery Algorithm Comparison</div>
+        <table class="data-table">
+          <tr><th>Algorithm</th><th>Best For</th><th>Handles Noise</th><th>Short Loops</th><th>Complexity</th></tr>
+          <tr><td>Alpha Miner</td><td>Clean, simple logs</td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td style="color:var(--accent3)">Low</td></tr>
+          <tr><td>Heuristics Miner</td><td>Noisy, real-world logs</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-yellow">Partial</span></td><td style="color:var(--warn)">Medium</td></tr>
+          <tr><td>Inductive Miner</td><td>Guaranteed sound models</td><td><span class="badge badge-yellow">Partial</span></td><td><span class="badge badge-green">Yes</span></td><td style="color:var(--warn)">Medium</td></tr>
+          <tr><td>Fuzzy Miner</td><td>Complex, spaghetti processes</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td><td style="color:var(--danger)">High</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 14. Case Studies -->
+    <div id="section-casestudies" class="section">
+      <div class="section-title">Real-World Case Studies</div>
+      <div class="section-desc">How enterprises across industries use process mining to drive measurable outcomes.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="case-card">
+          <div class="case-tag" style="color:var(--accent)">P2P — Manufacturing</div>
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px">BMW Group</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Identified ₹500M+ in payment discounts being left on the table due to late invoice processing. Celonis revealed that 38% of invoices were parked manually without auto-posting — a SAP configuration gap invisible to auditors.</div>
+          <div class="case-stat">
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent3)">€170M</div><div class="case-stat-lbl">Savings captured</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent)">80%</div><div class="case-stat-lbl">Touchless invoices</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--warn)">6 wks</div><div class="case-stat-lbl">To first insight</div></div>
+          </div>
+        </div>
+
+        <div class="case-card">
+          <div class="case-tag" style="color:var(--accent3)">O2C — Pharma</div>
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px">Pfizer</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Order-to-cash cycle exceeded 35 days on average. Process mining discovered that 22% of orders were blocked for credit checks that were ultimately approved — adding 4+ days per case with zero risk reduction benefit.</div>
+          <div class="case-stat">
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent3)">-8d</div><div class="case-stat-lbl">DSO reduction</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent)">$1.2B</div><div class="case-stat-lbl">Working capital freed</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--warn)">22%</div><div class="case-stat-lbl">False blocks removed</div></div>
+          </div>
+        </div>
+
+        <div class="case-card">
+          <div class="case-tag" style="color:var(--warn)">ITSM — Telecom</div>
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px">Vodafone</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">IT incident resolution averaged 14 hours. Mining ServiceNow data revealed that 60% of P2 incidents were reassigned more than twice before resolution — a skills-routing failure, not a volume problem.</div>
+          <div class="case-stat">
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent3)">-40%</div><div class="case-stat-lbl">Resolution time</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent)">95%</div><div class="case-stat-lbl">First-assign rate</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--warn)">€18M</div><div class="case-stat-lbl">SLA penalty savings</div></div>
+          </div>
+        </div>
+
+        <div class="case-card">
+          <div class="case-tag" style="color:var(--accent2)">Logistics — Retail</div>
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px">Siemens</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Supply chain delays were costing €2M/month in expediting fees. Object-centric process mining mapped the PO → Delivery → GR → Invoice flow across 12 plants simultaneously, revealing bottlenecks at the port-of-entry GR step.</div>
+          <div class="case-stat">
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent3)">€24M</div><div class="case-stat-lbl">Annual savings</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--accent)">-31%</div><div class="case-stat-lbl">Expediting costs</div></div>
+            <div class="case-stat-item"><div class="case-stat-val" style="color:var(--warn)">12</div><div class="case-stat-lbl">Plants analyzed</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ---- Navigation ----
+const visited = new Set(['intro']);
+
+function navigate(id, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  el.classList.add('active');
+  visited.add(id);
+  const total = document.querySelectorAll('.nav-item').length;
+  const pct = Math.round((visited.size / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+  if (id === 'market') initMarketChart();
+  if (id === 'processgraph') initProcessGraph();
+  if (id === 'eventlog') initFreqBars();
+}
+
+// ---- Tabs ----
+function switchTab(tabId, el) {
+  ['log-view','log-stats','log-variants'].forEach(id => {
+    const el2 = document.getElementById(id);
+    if (el2) el2.style.display = 'none';
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).style.display = 'block';
+  el.classList.add('active');
+  if (tabId === 'log-stats') initFreqBars();
+}
+
+// ---- Market Chart ----
+let marketChart = null;
+function initMarketChart() {
+  if (marketChart) return;
+  const ctx = document.getElementById('market-chart');
+  const labels = ['2019','2020','2021','2022','2023','2024','2025','2026','2027','2028'];
+  const data = [0.6, 0.9, 1.3, 1.9, 2.7, 3.8, 5.4, 7.2, 9.1, 11.5];
+  const colors = labels.map((_, i) => i < 5 ? '#00d4ff' : '#7c3aed');
+  marketChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Market Size ($B)',
+        data,
+        backgroundColor: colors,
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' $' + ctx.parsed.y + 'B' } }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(42,63,95,.4)' } },
+        y: { ticks: { color: '#94a3b8', callback: v => '$' + v + 'B' }, grid: { color: 'rgba(42,63,95,.4)' } }
+      }
+    }
+  });
+}
+
+// ---- Activity frequency bars ----
+function initFreqBars() {
+  const activities = ['Create PO','Approve PO','Goods Receipt','Invoice Received','Payment Cleared'];
+  const counts = [20, 20, 22, 20, 20];
+  const max = Math.max(...counts);
+  const colors = ['#00d4ff','#00d4ff','#ef4444','#f59e0b','#10b981'];
+  const container = document.getElementById('freq-bars');
+  if (!container) return;
+  container.innerHTML = activities.map((a, i) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:130px;font-size:12px;color:var(--muted);text-align:right;flex-shrink:0">${a}</div>
+      <div style="flex:1;background:var(--border);border-radius:4px;height:20px;position:relative">
+        <div style="width:${(counts[i]/max*100).toFixed(0)}%;background:${colors[i]};height:100%;border-radius:4px;transition:width .6s ease"></div>
+      </div>
+      <div style="width:28px;font-size:12px;font-weight:600">${counts[i]}</div>
+    </div>
+  `).join('');
+}
+
+// ---- Process Graph (SVG D3) ----
+let graphInit = false;
+function initProcessGraph() {
+  if (graphInit) return;
+  graphInit = true;
+  toggleVariant('happy');
+}
+
+const nodes = [
+  { id: 'create', label: 'Create PO', x: 80, y: 130, cases: 20 },
+  { id: 'approve', label: 'Approve PO', x: 220, y: 80, cases: 20 },
+  { id: 'reject', label: 'Reject PO', x: 220, y: 200, cases: 5 },
+  { id: 'gr', label: 'Goods Receipt', x: 380, y: 100, cases: 22 },
+  { id: 'inv', label: 'Invoice', x: 520, y: 100, cases: 20 },
+  { id: 'pay', label: 'Payment', x: 635, y: 100, cases: 20 },
+];
+
+const edges = {
+  happy: [
+    { from: 'create', to: 'approve', freq: 20, time: '5h', color: '#00d4ff' },
+    { from: 'approve', to: 'gr', freq: 15, time: '2d', color: '#00d4ff' },
+    { from: 'gr', to: 'inv', freq: 20, time: '1d', color: '#00d4ff' },
+    { from: 'inv', to: 'pay', freq: 20, time: '4d', color: '#10b981' },
+  ],
+  all: [
+    { from: 'create', to: 'approve', freq: 20, time: '5h', color: '#00d4ff' },
+    { from: 'approve', to: 'gr', freq: 15, time: '2d', color: '#00d4ff' },
+    { from: 'create', to: 'gr', freq: 5, time: '21h', color: '#ef4444' },
+    { from: 'gr', to: 'approve', freq: 5, time: '1d', color: '#f59e0b' },
+    { from: 'approve', to: 'reject', freq: 5, time: '2h', color: '#f59e0b' },
+    { from: 'reject', to: 'create', freq: 5, time: '1h', color: '#f59e0b' },
+    { from: 'gr', to: 'inv', freq: 20, time: '1d', color: '#00d4ff' },
+    { from: 'inv', to: 'pay', freq: 20, time: '4d', color: '#10b981' },
+  ],
+  deviation: [
+    { from: 'create', to: 'gr', freq: 5, time: '21h', color: '#ef4444' },
+    { from: 'gr', to: 'approve', freq: 5, time: '1d', color: '#ef4444' },
+    { from: 'approve', to: 'reject', freq: 5, time: '2h', color: '#f59e0b' },
+    { from: 'reject', to: 'create', freq: 5, time: '1h', color: '#f59e0b' },
+    { from: 'gr', to: 'inv', freq: 20, time: '1d', color: '#94a3b8' },
+    { from: 'inv', to: 'pay', freq: 20, time: '4d', color: '#94a3b8' },
+  ]
+};
+
+function toggleVariant(mode) {
+  const svg = document.getElementById('process-graph');
+  if (!svg) return;
+  svg.innerHTML = '';
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  // Defs / arrow markers
+  const defs = document.createElementNS(svgNS, 'defs');
+  const colors = ['#00d4ff','#ef4444','#f59e0b','#10b981','#94a3b8'];
+  colors.forEach(c => {
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id', 'arr-' + c.replace('#',''));
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', 'M2 1L8 5L2 9');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', c);
+    path.setAttribute('stroke-width', '1.5');
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  // Edges
+  (edges[mode] || edges.happy).forEach(e => {
+    const s = nodeMap[e.from], t = nodeMap[e.to];
+    if (!s || !t) return;
+    const w = Math.max(1.5, e.freq / 5);
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', s.x + 52); line.setAttribute('y1', s.y + 18);
+    line.setAttribute('x2', t.x - 2); line.setAttribute('y2', t.y + 18);
+    line.setAttribute('stroke', e.color);
+    line.setAttribute('stroke-width', w);
+    line.setAttribute('marker-end', `url(#arr-${e.color.replace('#','')})`);
+    svg.appendChild(line);
+
+    // Edge label (freq)
+    const mx = (s.x + 52 + t.x - 2) / 2;
+    const my = (s.y + t.y) / 2 + 12;
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', mx); text.setAttribute('y', my);
+    text.setAttribute('fill', e.color);
+    text.setAttribute('font-size', '10');
+    text.setAttribute('text-anchor', 'middle');
+    text.textContent = e.freq + 'x · ' + e.time;
+    svg.appendChild(text);
+  });
+
+  // Nodes (only render nodes that appear in this mode's edges)
+  const usedIds = new Set();
+  (edges[mode] || edges.happy).forEach(e => { usedIds.add(e.from); usedIds.add(e.to); });
+  nodes.filter(n => usedIds.has(n.id)).forEach(n => {
+    const g = document.createElementNS(svgNS, 'g');
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', n.x); rect.setAttribute('y', n.y);
+    rect.setAttribute('width', '100'); rect.setAttribute('height', '36');
+    rect.setAttribute('rx', '8');
+    rect.setAttribute('fill', '#1e2d40');
+    rect.setAttribute('stroke', n.id === 'reject' ? '#ef4444' : '#00d4ff');
+    rect.setAttribute('stroke-width', '1');
+    g.appendChild(rect);
+
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', n.x + 50); label.setAttribute('y', n.y + 18);
+    label.setAttribute('fill', '#e2e8f0');
+    label.setAttribute('font-size', '11');
+    label.setAttribute('font-weight', '600');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'central');
+    label.textContent = n.label;
+    g.appendChild(label);
+
+    const count = document.createElementNS(svgNS, 'text');
+    count.setAttribute('x', n.x + 50); count.setAttribute('y', n.y + 30);
+    count.setAttribute('fill', '#94a3b8');
+    count.setAttribute('font-size', '9');
+    count.setAttribute('text-anchor', 'middle');
+    count.textContent = n.cases + ' cases';
+    g.appendChild(count);
+
+    svg.appendChild(g);
+  });
+}
+
+// ---- Object-Centric Toggle ----
+function toggleOC(checked) {
+  document.getElementById('oc-case').style.display = checked ? 'none' : 'block';
+  document.getElementById('oc-object').style.display = checked ? 'block' : 'none';
+  document.getElementById('oc-label').textContent = checked ? 'Object-Centric View' : 'Case-Centric View';
+}
+</script>
+</body>
+</html>
